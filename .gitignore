@@ -1,0 +1,32 @@
+# Data files
+objects/
+reports/
+cookbooks/
+*.json
+
+# Log files
+*.log
+
+# Temp files
+*.tmp
+*.tmp.*
+*.tmp.*.*
+*.tmp.*.*.*
+
+# Editors and IDE files
+.vscode/
+.idea/
+.cursor/
+.cursorrules/
+.eclipse/
+*.swp
+*.swo
+*.swn
+*.swh
+*.swhl
+*.swhn
+*.swhp
+*.swhs
+*.swhs
+*.swhs
+*.swhs

@@ -1,0 +1,110 @@
+#! /usr/bin/env knife exec
+
+require 'json'
+
+cookbooks = {}
+
+################################################################################
+# This uses seach to fetch the nodes (so we don't pull complete node data)
+################################################################################
+def fetch_nodes()
+    search(:node, "fqdn:*", filter_result: {
+        'fqdn' => [ 'fqdn' ],
+        'run_list' => [ 'run_list' ],
+        'expanded_run_list' => [ 'expanded_run_list' ],
+        'cookbooks' => [ 'cookbooks' ],
+        'chef_packages' => [ 'chef_packages' ],
+        'ipaddress' => [ 'ipaddress' ],
+        'platform' => [ 'platform' ],
+        'platform_version' => [ 'platform_version' ],
+        'platform_family' => [ 'platform_family' ],
+    }).map do |node|
+        node['chef_major_version'] = node['chef_packages']['chef']['version'].split('.').first
+        node
+    end
+end
+
+################################################################################
+# This processes the nodes and calls the cookbook counter
+################################################################################
+def process_nodes(nodes, cookbooks)
+    nodes.each do |node|
+        puts "Processing node: #{node['fqdn']}"
+        update_cookbook_counts(node, cookbooks)
+    end
+end
+
+################################################################################
+# This increments the cookbook counts for each cookbook used by the node
+################################################################################
+def update_cookbook_counts(node, cookbooks)
+    node['cookbooks'].each do |name,cookbook|
+        name_version = "#{name}-#{cookbook['version']}"
+        if cookbooks[name_version]
+            cookbooks[name_version]['count'] += 1
+        else
+            cookbooks[name_version] = { "count" => 1, "name" => name , "version" => cookbook['version'] }
+        end
+    end
+end
+
+################################################################################
+# This shells out to cookstyle to get a JSON report of the cookbook
+################################################################################
+def cookstyle(cookbook_path)
+    report = JSON.parse(`cookstyle --format json #{cookbook_path}`)
+    summary = {}
+    summary['summary'] = report['summary']
+    File.write(File.join('reports', cookbook_path.split('/').last + '.json'), JSON.pretty_generate(report))
+    File.write(File.join('summary_reports', cookbook_path.split('/').last + '.summary.json'), JSON.pretty_generate(summary))
+    return report, summary
+end
+
+################################################################################
+# This downloads the cookbooks
+################################################################################
+def download_cookbooks(cookbooks)
+    cookbook_downloader = Chef::Knife::CookbookDownload.new
+    cookbook_downloader.config[:download_directory] = 'cookbooks'
+    cookbooks.each do |name, cookbook|
+        if dir_exist? File.join(cookbook_downloader.config[:download_directory], cookbook['name']+'-'+cookbook['version'])
+            puts "Cookbook already downloaded: #{name}"
+        else
+            puts "Downloading cookbook: #{name}"
+            cookbook_downloader.name_args = [cookbook['name'], cookbook['version']]
+            cookbook_downloader.run
+        end
+    end
+end
+
+########################################################
+# Start of the script
+########################################################
+mkdir_p('reports') unless dir_exist? ('reports')
+mkdir_p('summary_reports') unless dir_exist? ('summary_reports')
+mkdir_p('cookbooks') unless dir_exist? ('cookbooks')
+mkdir_p('objects') unless dir_exist? ('objects')
+
+puts "Fetching nodes"
+nodes = fetch_nodes()
+File.write(File.join('objects', 'nodes.json'), JSON.pretty_generate(nodes))
+
+process_nodes(nodes, cookbooks)
+File.write(File.join('objects', 'cookbooks.json'), JSON.pretty_generate(cookbooks))
+
+puts "Downloading cookbooks"
+download_cookbooks(cookbooks)
+
+puts "Running cookstyle analysis"
+cookbooks.each do |name, cookbook|
+    puts "Cookstyle analysis: #{name}"
+    report,summary=cookstyle(File.join('cookbooks', cookbook['name']+'-'+cookbook['version']))
+    cookbooks[name]['cookstyle'] = summary
+end
+
+# Write the cookbooks object with the cookstyle summary
+File.write(File.join('objects', 'cookbooks.json'), JSON.pretty_generate(cookbooks))
+
+puts
+puts "Total Nodes: #{nodes.length}"
+puts "Total Cookbooks: #{cookbooks.length}"
