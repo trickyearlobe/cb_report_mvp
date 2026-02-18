@@ -8,7 +8,8 @@ cookbooks = {}
 # This uses seach to fetch the nodes (so we don't pull complete node data)
 ################################################################################
 def fetch_nodes()
-    search(:node, "fqdn:*", filter_result: {
+    search(:node, "*:*", filter_result: {
+        'name' => [ 'name' ],
         'fqdn' => [ 'fqdn' ],
         'run_list' => [ 'run_list' ],
         'expanded_run_list' => [ 'expanded_run_list' ],
@@ -19,7 +20,8 @@ def fetch_nodes()
         'platform_version' => [ 'platform_version' ],
         'platform_family' => [ 'platform_family' ],
     }).map do |node|
-        node['chef_major_version'] = node['chef_packages']['chef']['version'].split('.').first
+        node['chef_major_version'] = node.dig('chef_packages','chef','version')&.split('.')&.first || "0"
+        node['cookbooks'] ||= []
         node
     end
 end
