@@ -1,0 +1,49 @@
+#! /usr/bin/env ruby
+
+require 'json'
+require 'fileutils'
+require 'date'
+
+################################################################################
+# This runs kitchen test on a cookbook
+################################################################################
+def run_kitchen_test(cookbook_path)
+    Dir.chdir(cookbook_path) do
+        result = `kitchen test 2>&1`
+        exit_code = $?.exitstatus
+        cookbook_name = File.basename(cookbook_path)
+        report = {
+            'cookbook' => cookbook_name,
+            'exit_code' => exit_code,
+            'output' => result,
+            'timestamp' => Time.now
+        }
+        return report
+    end
+end
+
+########################################################
+# Start of the script
+########################################################
+report_directory = File.join('reports','kitchen')
+FileUtils.mkdir_p(report_directory)
+
+unless Dir.exist?('cookbooks')
+    puts "Cookbooks directory not found. Run fetch_cookbooks first."
+    exit 1
+end
+
+puts "Running kitchen tests on all cookbooks"
+Dir.glob('cookbooks/*').each do |cookbook_path|
+    next unless File.directory?(cookbook_path)
+    cookbook_name = File.basename(cookbook_path)
+    puts "Kitchen test: #{cookbook_name}"
+    begin
+        report = run_kitchen_test(cookbook_path)
+        File.write(File.join(report_directory, cookbook_name + '.json'), JSON.pretty_generate(report))
+    rescue => e
+        puts "Error running kitchen test on #{cookbook_name}: #{e.message}"
+    end
+end
+
+puts "Kitchen tests complete"

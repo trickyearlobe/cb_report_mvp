@@ -1,0 +1,30 @@
+#! /usr/bin/env knife exec
+
+require 'json'
+require 'date'
+
+################################################################################
+# This uses seach to fetch the nodes (so we don't pull complete node data)
+################################################################################
+nodelist = search(:node, "*:*", filter_result: {
+    'name' => [ 'name' ],
+    'fqdn' => [ 'fqdn' ],
+    'run_list' => [ 'run_list' ],
+    'expanded_run_list' => [ 'expanded_run_list' ],
+    'cookbooks' => [ 'cookbooks' ],
+    'chef_packages' => [ 'chef_packages' ],
+    'ipaddress' => [ 'ipaddress' ],
+    'platform' => [ 'platform' ],
+    'platform_version' => [ 'platform_version' ],
+    'platform_family' => [ 'platform_family' ],
+    'ohai_time' => [ 'ohai_time' ],
+}).map do |node|
+    node['@timestamp'] = Time.at( node['ohai_time'] || 0).iso8601
+    node['chef_major_version'] = node.dig('chef_packages','chef','version')&.split('.')&.first || "0"
+    node['cookbooks'] ||= []
+
+    node
+end
+
+Dir.mkdir('objects') unless Dir.exist?('objects')
+File.write(File.join('objects', 'nodes.json'), JSON.pretty_generate(nodelist))

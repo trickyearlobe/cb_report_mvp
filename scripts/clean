@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+rm -rf cookbooks
+rm -rf objects
+rm -rf reports
+rm -rf summary_reports

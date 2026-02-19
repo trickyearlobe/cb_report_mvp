@@ -1,0 +1,52 @@
+#! /usr/bin/env knife exec
+
+require 'json'
+
+################################################################################
+# This downloads cookbooks from the Chef server
+################################################################################
+def download_cookbooks(cookbook_metadata)
+    cookbook_downloader = Chef::Knife::CookbookDownload.new
+    cookbook_downloader.config[:download_directory] = 'cookbooks'
+    cookbook_metadata.each do |name, versions|
+        versions.each do |version, cookbook|
+            if dir_exist? File.join(cookbook_downloader.config[:download_directory], name+'-'+version)
+                puts "Cookbook already downloaded: #{name}"
+            else
+                puts "Downloading cookbook: #{name}"
+                cookbook_downloader.name_args = [name, version]
+                cookbook_downloader.run
+            end
+        end
+    end
+end
+
+############################################################################################
+# This returns a list of all cookbooks and their versions with metadata from the Chef server
+############################################################################################
+def cookbook_metadata
+    cookbooks = {}
+    cookbook_list = api.get('/cookbooks')
+    cookbook_list.each do |name,versions|
+        cookbooks[name] = {}
+        versions['versions'].each do |v|
+            cookbooks[name][v['version']] = {
+                "metadata" => api.get("/cookbooks/#{name}/#{v['version']}")['metadata']
+            }
+        end
+    end
+    return cookbooks
+end
+
+
+########################################################
+# Start of the script
+########################################################
+mkdir_p("objects") unless dir_exist? "objects"
+mkdir_p("cookbooks") unless dir_exist? "cookbooks"
+
+metadata = cookbook_metadata
+File.write(File.join('objects', 'cookbook_metadata.json'), JSON.pretty_generate(metadata))
+
+puts "Downloading cookbooks"
+download_cookbooks(metadata)

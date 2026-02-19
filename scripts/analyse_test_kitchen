@@ -1,0 +1,58 @@
+#! /usr/bin/env ruby
+
+require 'json'
+require 'fileutils'
+
+################################################################################
+# This analyzes kitchen test results
+################################################################################
+def analyze_kitchen_results()
+    cookbooks = JSON.parse(File.read(File.join('objects', 'cookbooks.json'))) rescue {}
+    
+    unless Dir.exist?('kitchen_reports')
+        puts "Kitchen reports directory not found. Run run_kitchen first."
+        return
+    end
+    
+    total_tests = 0
+    passed_tests = 0
+    failed_tests = 0
+    
+    Dir.glob('kitchen_reports/*.json').each do |report_file|
+        begin
+            report = JSON.parse(File.read(report_file))
+            cookbook_name = File.basename(report_file, '.json')
+            
+            if cookbooks[cookbook_name]
+                cookbooks[cookbook_name]['kitchen'] = {
+                    'exit_code' => report['exit_code'],
+                    'timestamp' => report['timestamp'],
+                    'passed' => report['exit_code'] == 0
+                }
+                total_tests += 1
+                if report['exit_code'] == 0
+                    passed_tests += 1
+                else
+                    failed_tests += 1
+                end
+            end
+        rescue => e
+            puts "Error reading #{report_file}: #{e.message}"
+        end
+    end
+    
+    File.write(File.join('objects', 'cookbooks.json'), JSON.pretty_generate(cookbooks))
+    
+    puts
+    puts "Kitchen Test Analysis Summary:"
+    puts "  Total tests run: #{total_tests}"
+    puts "  Passed: #{passed_tests}"
+    puts "  Failed: #{failed_tests}"
+end
+
+########################################################
+# Start of the script
+########################################################
+FileUtils.mkdir_p('objects') unless Dir.exist?('objects')
+
+analyze_kitchen_results()

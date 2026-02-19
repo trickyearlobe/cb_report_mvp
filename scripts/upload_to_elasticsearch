@@ -1,0 +1,73 @@
+#! /usr/bin/env ruby
+
+require 'json'
+require 'net/http'
+require 'net/https'
+require 'uri'
+
+
+################################################################################
+# This uploads objects to Elasticsearch
+################################################################################
+def upload_to_elasticsearch(key, document_type, data )
+    elasticsearch_url = ENV['ELASTICSEARCH_URL'] || 'http://localhost:9200'
+    index_name = ENV['CHEF_REPORT_INDEX'] || 'chefmetrics'
+    uri = URI("#{elasticsearch_url}/#{index_name}/_doc/#{key}")
+
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true if uri.scheme == 'https'
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE if uri.scheme == 'https'
+    request = Net::HTTP::Post.new(uri.path)
+    request['Content-Type'] = 'application/json'
+    request.basic_auth(ENV['ELASTICSEARCH_USER'], ENV['ELASTICSEARCH_PASSWORD']) if ENV['ELASTICSEARCH_USER'] && ENV['ELASTICSEARCH_PASSWORD']
+
+    datawrapper = {}
+    datawrapper[document_type] = data
+    request.body = datawrapper.to_json
+    begin
+        response = http.request(request)
+    if response.code.to_i >= 200 && response.code.to_i < 300
+            puts "Successfully uploaded to #{index_name}/#{document_type}/#{key}"
+            return true
+        else
+            puts "Error uploading to #{index_name}/#{document_type}/#{key}: #{response.code} - #{response.body}"
+            return false
+        end
+    rescue => e
+        puts "Error uploading to #{index_name}/#{document_type}: #{e.message}"
+        return false
+    end
+end
+
+########################################################
+# Start of the script
+########################################################
+puts "ELASTICSEARCH_URL is not set" unless ENV['ELASTICSEARCH_URL']
+puts "CHEF_REPORT_INDEX is not set" unless ENV['CHEF_REPORT_INDEX']
+
+unless Dir.exist?('objects')
+    puts "Objects directory not found. Run analysis scripts first."
+    exit 1
+end
+
+puts "Uploading results to Elasticsearch"
+
+# Upload nodes
+if File.exist?(File.join('objects', 'nodes.json'))
+    nodes = JSON.parse(File.read(File.join('objects', 'nodes.json')))
+    nodes.each do |node|
+        upload_to_elasticsearch(node['name'], 'node', node)
+    end
+    puts "Uploaded #{nodes.length} nodes"
+end
+
+# Upload cookbook metadata
+if File.exist?(File.join('objects', 'cookbook_metadata.json'))
+    cookbooks = JSON.parse(File.read(File.join('objects', 'cookbook_metadata.json')))
+    cookbooks.each do |name, cookbook|
+        upload_to_elasticsearch(name, 'cookbook-metadata', cookbook)
+    end
+    puts "Uploaded #{cookbooks.length} cookbook metadata"
+end
+
+puts "Upload complete"

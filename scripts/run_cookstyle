@@ -1,0 +1,39 @@
+#! /usr/bin/env ruby
+
+require 'json'
+require 'fileutils'
+
+################################################################################
+# This shells out to cookstyle to get a JSON report of the cookbook
+################################################################################
+def cookstyle(cookbook_path)
+    report = JSON.parse(`cookstyle #{cookbook_path} -fj`)
+    cookbook_name = cookbook_path.split('/').last
+    File.write(File.join('reports', 'cookstyle', cookbook_name + '.json'), JSON.pretty_generate(report))
+    return report
+end
+
+
+########################################################
+# Start of the script
+########################################################
+FileUtils.mkdir_p(File.join('reports', 'cookstyle')) unless Dir.exist?(File.join('reports', 'cookstyle'))
+
+unless Dir.exist?('cookbooks')
+    puts "Cookbooks directory not found. Run fetch_cookbooks first."
+    exit 1
+end
+
+puts "Running cookstyle on all cookbooks"
+Dir.glob('cookbooks/*').each do |cookbook_path|
+    next unless File.directory?(cookbook_path)
+    cookbook_name = File.basename(cookbook_path)
+    puts "Cookstyle analysis: #{cookbook_name}"
+    begin
+        cookstyle(cookbook_path)
+    rescue => e
+        puts "Error running cookstyle on #{cookbook_name}: #{e.message}"
+    end
+end
+
+puts "Cookstyle analysis complete"

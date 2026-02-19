@@ -1,0 +1,54 @@
+#! /usr/bin/env ruby
+
+require 'json'
+require 'fileutils'
+
+################################################################################
+# This analyzes cookstyle results from summary reports
+################################################################################
+def analyze_cookstyle_results()
+    cookbooks = JSON.parse(File.read(File.join('objects', 'cookbooks.json'))) rescue {}
+    
+    unless Dir.exist?('summary_reports')
+        puts "Summary reports directory not found. Run run_cookstyle first."
+        return
+    end
+    
+    total_offenses = 0
+    total_files = 0
+    cookbooks_with_offenses = 0
+    
+    Dir.glob('summary_reports/*.summary.json').each do |summary_file|
+        begin
+            summary = JSON.parse(File.read(summary_file))
+            cookbook_name = File.basename(summary_file, '.summary.json')
+            
+            if cookbooks[cookbook_name]
+                cookbooks[cookbook_name]['cookstyle'] = summary
+                offenses = summary.dig('summary', 'offense_count') || 0
+                files = summary.dig('summary', 'target_file_count') || 0
+                total_offenses += offenses
+                total_files += files
+                cookbooks_with_offenses += 1 if offenses > 0
+            end
+        rescue => e
+            puts "Error reading #{summary_file}: #{e.message}"
+        end
+    end
+    
+    File.write(File.join('objects', 'cookbooks.json'), JSON.pretty_generate(cookbooks))
+    
+    puts
+    puts "Cookstyle Analysis Summary:"
+    puts "  Total cookbooks analyzed: #{cookbooks.length}"
+    puts "  Cookbooks with offenses: #{cookbooks_with_offenses}"
+    puts "  Total offenses: #{total_offenses}"
+    puts "  Total files inspected: #{total_files}"
+end
+
+########################################################
+# Start of the script
+########################################################
+FileUtils.mkdir_p('objects') unless Dir.exist?('objects')
+
+analyze_cookstyle_results()
