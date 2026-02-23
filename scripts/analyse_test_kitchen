@@ -9,8 +9,8 @@ require 'fileutils'
 def analyze_kitchen_results()
     cookbooks = JSON.parse(File.read(File.join('objects', 'cookbooks.json'))) rescue {}
     
-    unless Dir.exist?('kitchen_reports')
-        puts "Kitchen reports directory not found. Run run_kitchen first."
+    unless Dir.exist?(File.join('reports', 'kitchen'))
+        puts "Kitchen reports directory not found. Call run_kitchen first."
         return
     end
     
@@ -18,7 +18,7 @@ def analyze_kitchen_results()
     passed_tests = 0
     failed_tests = 0
     
-    Dir.glob('kitchen_reports/*.json').each do |report_file|
+    Dir.glob(File.join('reports','kitchen','*.json')).each do |report_file|
         begin
             report = JSON.parse(File.read(report_file))
             cookbook_name = File.basename(report_file, '.json')
@@ -27,7 +27,8 @@ def analyze_kitchen_results()
                 cookbooks[cookbook_name]['kitchen'] = {
                     'exit_code' => report['exit_code'],
                     'timestamp' => report['timestamp'],
-                    'passed' => report['exit_code'] == 0
+                    'passed' => report['exit_code'] == 0,
+                    'output' => report['output']
                 }
                 total_tests += 1
                 if report['exit_code'] == 0
@@ -41,7 +42,7 @@ def analyze_kitchen_results()
         end
     end
     
-    File.write(File.join('objects', 'cookbooks.json'), JSON.pretty_generate(cookbooks))
+    File.write(File.join('objects', 'kitchen.json'), JSON.pretty_generate(cookbooks))
     
     puts
     puts "Kitchen Test Analysis Summary:"

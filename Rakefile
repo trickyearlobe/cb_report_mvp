@@ -1,9 +1,15 @@
 task :default do
-    puts `rake -T`
+    puts `rake --tasks`
 end
 
 desc "All tasks"
-task :all => [ :fetch => :all, :run => :all, :analyse => :all]
+task :all => [
+    'fetch:all',
+    'run:all',
+    'analyse:all',
+    # 'upload_to_elasticsearch',
+    # 'clean'
+]
 
 desc "Tasks for fetching data"
 namespace :fetch do
@@ -31,37 +37,37 @@ namespace :run do
     desc "Run linting using cookstyle against all cookbooks"
     task :cookstyle do
         puts "Running cookstyle on all cookbooks"
-        `./scripts/run_cookstyle`
+        puts `./scripts/run_cookstyle`
     end
 
     desc "Run converge and functional tests against all cookbooks"
     task :kitchen do
         puts "Running kitchen converge and functional tests on all cookbooks"
-        `./scripts/run_kitchen`
+        puts`./scripts/run_kitchen`
     end
 end
 
 desc "Tasks for analysing data"
 namespace :analyse do
     desc "Analyse all data"
-    task :all => [ :cookbook_usage, :cookstyle, :test_kitchen ]
+    task :all => [ :cookbook_usage, :cookstyle, :kitchen ]
 
     desc "Analyse cookbook usage from node data"
         task :cookbook_usage do
             puts "Analysing cookbook usage from node data"
-        `./scripts/analyse_cookbook_usage`
+        puts `./scripts/analyse_cookbook_usage`
     end
 
     desc "Analyse cookstyle results and merge it to the cookbook reports"
     task :cookstyle do
-        puts "Analysing cookstyle results on all cookbooks"
-        `./scripts/analyse_cookbook_style`
+        puts "Analysing cookstyle results on downloaded cookbooks"
+        puts `./scripts/analyse_cookbook_style`
     end
 
     desc "Analyse test kitchen results and merge it to the cookbook reports"
-    task :analyse_test_kitchen do
+    task :kitchen do
         puts "Analysing test kitchen results on all cookbooks"
-        `./scripts/analyse_test_kitchen`
+        puts `./scripts/analyse_test_kitchen`
     end
 end
 

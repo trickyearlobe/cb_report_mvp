@@ -4,6 +4,13 @@ reports/
 cookbooks/
 *.json
 
+# Secrets
+*.pem
+*.crt
+*.cert
+*.key
+*.csr
+
 # Log files
 *.log
 
